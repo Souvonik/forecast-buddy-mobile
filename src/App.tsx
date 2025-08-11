@@ -9,6 +9,7 @@ import MobileLayout from "./layouts/MobileLayout";
 import Forecast from "./pages/Forecast";
 import Upload from "./pages/Upload";
 import About from "./pages/About";
+import MapPage from "./pages/Map";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route element={<MobileLayout />}>
+            <Route path="/map" element={<MapPage />} />
             <Route path="/forecast" element={<Forecast />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/about" element={<About />} />

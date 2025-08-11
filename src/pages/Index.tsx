@@ -15,7 +15,7 @@ const Index = () => {
           Predict demand with interactive charts and upload your own datasets.
         </p>
         <div className="flex items-center justify-center gap-3">
-          <Link to="/forecast">
+          <Link to="/map">
             <Button variant="hero" className="px-6">Get Started</Button>
           </Link>
           <Link to="/about">
