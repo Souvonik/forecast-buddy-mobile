@@ -1,10 +1,9 @@
 import { NavLink } from "react-router-dom";
-import { MapPin, LineChart, Upload, Info } from "lucide-react";
+import { MapPin, LineChart, Info } from "lucide-react";
 
 const tabs = [
   { to: "/map", label: "Map", Icon: MapPin },
-  { to: "/forecast", label: "Forecast", Icon: LineChart },
-  { to: "/upload", label: "Upload", Icon: Upload },
+  { to: "/forecast", label: "Metrics", Icon: LineChart },
   { to: "/about", label: "About", Icon: Info },
 ];
 
