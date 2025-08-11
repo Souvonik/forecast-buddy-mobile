@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,22 +8,94 @@ import { Seo } from "@/components/seo/Seo";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { findCityByName } from "@/data/cities";
-
-const dayData = Array.from({ length: 24 }, (_, i) => ({
-  time: `${i}:00`,
-  actual: Math.round(40 + Math.sin(i / 3) * 10 + (i > 18 ? 8 : 0)),
-  forecast: Math.round(42 + Math.sin(i / 3 + 0.3) * 10 + (i > 18 ? 6 : 0)),
-}));
+import { getForecastData } from "@/api/api";
 
 export default function Forecast() {
   const [searchParams] = useSearchParams();
   const cityName = searchParams.get("city") || "";
   const city = useMemo(() => (cityName ? findCityByName(cityName) : null), [cityName]);
+  const [forecastData, setForecastData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const data = (await getForecastData()) as any[];
+      setForecastData(data);
+    };
+    fetchData();
+  }, []);
+
+  const cityForecast = useMemo(() => {
+    if (!city || !forecastData.length) return [];
+    return forecastData.filter((row: any) => row.city?.toLowerCase() === city.name.toLowerCase());
+  }, [city, forecastData]);
+
+  const [timeRange, setTimeRange] = useState("day");
+
+  const chartData = useMemo(() => {
+    if (!cityForecast.length) return [];
+
+    const now = new Date();
+
+    const dataWithValidDate = cityForecast
+      .map((row: any) => ({ ...row, date: new Date(row.date) }))
+      .filter((row: any) => !isNaN(row.date.getTime()));
+
+    if (timeRange === "day") {
+      return cityForecast
+        .map((row: any) => ({
+          time: `${row.hour}:00`,
+          actual: parseFloat(row.actual),
+          forecast: parseFloat(row.forecast),
+        }))
+        .slice(-24);
+    }
+
+    const aggregate = (data: any[], unit: "week" | "month") => {
+      const grouped = data.reduce((acc, row) => {
+        const key =
+          unit === "week"
+            ? row.date.toLocaleDateString([], { weekday: "short" })
+            : `${row.date.getDate()}`;
+        if (!acc[key]) {
+          acc[key] = { actuals: [], forecasts: [] };
+        }
+        acc[key].actuals.push(parseFloat(row.actual));
+        acc[key].forecasts.push(parseFloat(row.forecast));
+        return acc;
+      }, {});
+
+      return Object.entries(grouped).map(([key, value]: [string, any]) => ({
+        time: key,
+        actual: value.actuals.reduce((a: number, b: number) => a + b, 0) / value.actuals.length,
+        forecast: value.forecasts.reduce((a: number, b: number) => a + b, 0) / value.forecasts.length,
+      }));
+    };
+
+    if (timeRange === "week") {
+      const lastWeek = new Date(now.setDate(now.getDate() - 7));
+      const weeklyData = dataWithValidDate.filter((row: any) => row.date > lastWeek);
+      return aggregate(weeklyData, "week");
+    }
+
+    if (timeRange === "month") {
+      const lastMonth = new Date(now.setMonth(now.getMonth() - 1));
+      const monthlyData = dataWithValidDate.filter((row: any) => row.date > lastMonth);
+      return aggregate(monthlyData, "month");
+    }
+
+    return [];
+  }, [cityForecast, timeRange]);
 
   const [capacity, setCapacity] = useState<number>(4);
-  const sun = city?.avgSunHours ?? 4.5;
-  const generation = city ? capacity * sun : 0;
-  const savings = city ? generation * city.energyPricePerKWh : 0;
+  const { generation, savings } = useMemo(() => {
+    if (!city) return { generation: 0, savings: 0 };
+    const panelEfficiency = 0.2; // 20% efficiency
+    const panelArea = 1.6; // m² per kW
+    const insolation = city.solarInsolation ?? 4.5; // kWh/m²/day
+    const gen = capacity * insolation * panelEfficiency * panelArea; // kWh/day
+    const save = gen * city.energyPricePerKWh;
+    return { generation: gen, savings: save };
+  }, [city, capacity]);
 
   return (
     <div className="space-y-4">
@@ -78,7 +150,7 @@ export default function Forecast() {
           <CardTitle>Load Forecast</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="day" className="w-full">
+          <Tabs defaultValue="day" className="w-full" onValueChange={setTimeRange}>
             <TabsList className="grid grid-cols-3 w-full">
               <TabsTrigger value="day">Day</TabsTrigger>
               <TabsTrigger value="week">Week</TabsTrigger>
@@ -87,7 +159,7 @@ export default function Forecast() {
           </Tabs>
           <div className="h-64 mt-4">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dayData} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
+              <LineChart data={chartData} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="time" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />

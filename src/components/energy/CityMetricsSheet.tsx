@@ -9,6 +9,7 @@ export type CityMetrics = {
   loadDemandKWh: number; // current avg load demand
   energyPricePerKWh: number; // local avg electricity price
   avgSunHours?: number; // default 4.5
+  solarInsolation?: number; // kWh/m²/day
 };
 
 type Props = {
@@ -23,8 +24,11 @@ export default function CityMetricsSheet({ open, onOpenChange, city }: Props) {
   // Recalculate when city or capacity changes
   const { generation, savings } = useMemo(() => {
     if (!city) return { generation: 0, savings: 0 };
-    const sun = city.avgSunHours ?? 4.5; // hours/day
-    const gen = capacity * sun; // kWh/day (very rough approximation)
+    // More realistic calculation
+    const panelEfficiency = 0.2; // 20% efficiency
+    const panelArea = 1.6; // m² per kW
+    const insolation = city.solarInsolation ?? 4.5; // kWh/m²/day
+    const gen = capacity * insolation * panelEfficiency * panelArea; // kWh/day
     const save = gen * city.energyPricePerKWh;
     return { generation: gen, savings: save };
   }, [city, capacity]);
